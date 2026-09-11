@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RCS • Disparos</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, -apple-system, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #0b1020; color: #edf2ff; }
+    .wrap { width: min(1120px, calc(100% - 32px)); margin: 36px auto; }
+    .top { display:flex; justify-content:space-between; gap:20px; align-items:center; margin-bottom:24px; }
+    h1 { margin:0; font-size:28px; }
+    .badge { padding:7px 11px; border:1px solid #31405f; border-radius:999px; color:#a9badc; font-size:13px; }
+    .grid { display:grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr); gap:20px; }
+    .card { background:#121a2d; border:1px solid #26324e; border-radius:18px; padding:22px; box-shadow:0 16px 50px rgba(0,0,0,.18); }
+    label { display:block; font-size:13px; color:#aebddd; margin:16px 0 7px; }
+    label:first-child { margin-top:0; }
+    input, textarea, select { width:100%; border:1px solid #34425f; background:#0c1427; color:#fff; border-radius:10px; padding:12px 13px; outline:none; }
+    input:focus, textarea:focus, select:focus { border-color:#6d91ff; }
+    textarea { min-height:110px; resize:vertical; }
+    button { width:100%; margin-top:18px; border:0; border-radius:11px; padding:13px 16px; font-weight:700; cursor:pointer; background:#6d91ff; color:#071023; }
+    button:disabled { opacity:.55; cursor:wait; }
+    .hint { color:#7f91b7; font-size:12px; margin-top:6px; }
+    .preview { border:1px solid #334260; border-radius:18px; overflow:hidden; background:#eef3fb; color:#172033; }
+    .preview img { width:100%; aspect-ratio:16/9; display:block; object-fit:cover; background:#dce4f1; }
+    .preview-body { padding:16px; }
+    .preview-title { font-weight:800; font-size:18px; margin-bottom:7px; }
+    .preview-desc { color:#536075; font-size:14px; white-space:pre-wrap; }
+    .preview-button { display:block; text-align:center; margin-top:16px; padding:10px; border-top:1px solid #d5dce8; color:#315fcc; font-weight:700; }
+    pre { margin:18px 0 0; background:#080e1b; border:1px solid #283650; border-radius:12px; padding:14px; min-height:90px; overflow:auto; white-space:pre-wrap; color:#b9c9e8; font-size:12px; }
+    .stats { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+    .stat { padding:7px 10px; background:#0b1326; border:1px solid #2d3a58; border-radius:9px; font-size:12px; }
+    @media (max-width: 820px) { .grid { grid-template-columns:1fr; } .top { align-items:flex-start; flex-direction:column; } }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="top">
+      <div>
+        <h1>RCS • Disparos</h1>
+        <div class="hint">Rich Card com imagem + botão Abrir URL</div>
+      </div>
+      <div class="badge" id="health">verificando configuração…</div>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <form id="form">
+          <label for="phones">Destinatários</label>
+          <textarea id="phones" required placeholder="+5518999999999&#10;+5518988888888"></textarea>
+          <div class="hint">Um telefone por linha, sempre no formato E.164.</div>
+
+          <label for="title">Título</label>
+          <input id="title" maxlength="200" required value="Oferta especial">
+
+          <label for="description">Descrição</label>
+          <textarea id="description" maxlength="2000" required>Confira as informações e toque no botão para continuar.</textarea>
+
+          <label for="imageUrl">URL pública da imagem</label>
+          <input id="imageUrl" type="url" required placeholder="https://seu-dominio.com/imagem.jpg">
+
+          <label for="buttonText">Texto do botão</label>
+          <input id="buttonText" maxlength="25" required value="Ver detalhes">
+
+          <label for="buttonUrl">URL do botão</label>
+          <input id="buttonUrl" type="url" required placeholder="https://seu-dominio.com/oferta">
+
+          <label for="trafficType">Tipo de tráfego</label>
+          <select id="trafficType">
+            <option value="PROMOTION">PROMOTION</option>
+            <option value="TRANSACTION">TRANSACTION</option>
+            <option value="SERVICEREQUEST">SERVICEREQUEST</option>
+            <option value="AUTHENTICATION">AUTHENTICATION</option>
+            <option value="ACKNOWLEDGEMENT">ACKNOWLEDGEMENT</option>
+          </select>
+
+          <button id="send" type="submit">Enviar disparo</button>
+        </form>
+        <div class="stats" id="stats"></div>
+        <pre id="result">Aguardando envio.</pre>
+      </section>
+
+      <aside class="card">
+        <label>Prévia aproximada</label>
+        <div class="preview">
+          <img id="previewImage" alt="Prévia da mídia">
+          <div class="preview-body">
+            <div class="preview-title" id="previewTitle">Oferta especial</div>
+            <div class="preview-desc" id="previewDescription">Confira as informações e toque no botão para continuar.</div>
+            <div class="preview-button" id="previewButton">Ver detalhes</div>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:12px">A renderização final depende do cliente RCS e das capacidades do aparelho.</div>
+      </aside>
+    </div>
+  </main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const form = $('form');
+  const send = $('send');
+  const result = $('result');
+  const stats = $('stats');
+
+  function syncPreview() {
+    $('previewTitle').textContent = $('title').value || 'Título';
+    $('previewDescription').textContent = $('description').value || 'Descrição';
+    $('previewButton').textContent = $('buttonText').value || 'Botão';
+    $('previewImage').src = $('imageUrl').value || '';
+  }
+  ['title','description','buttonText','imageUrl'].forEach(id => $(id).addEventListener('input', syncPreview));
+
+  fetch('/health').then(r => r.json()).then(data => {
+    $('health').textContent = data.agent_configured && data.credentials_configured
+      ? `configurado • região ${data.rcs_region}`
+      : 'falta configurar Agent ID/credencial';
+  }).catch(() => $('health').textContent = 'API indisponível');
+
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    stats.innerHTML = '';
+    send.disabled = true;
+    send.textContent = 'Enviando…';
+    result.textContent = 'Processando lote…';
+
+    const phones = $('phones').value.split(/\r?\n|,/).map(v => v.trim()).filter(Boolean);
+    const payload = {
+      phones,
+      title: $('title').value,
+      description: $('description').value,
+      image_url: $('imageUrl').value,
+      button_text: $('buttonText').value,
+      button_url: $('buttonUrl').value,
+      postback_data: 'open_url',
+      traffic_type: $('trafficType').value
+    };
+
+    try {
+      const response = await fetch('/api/v1/rcs/broadcast', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      result.textContent = JSON.stringify(data, null, 2);
+      if (response.ok) {
+        stats.innerHTML = `<span class="stat">Total: ${data.total}</span><span class="stat">Enviados: ${data.sent}</span><span class="stat">Falhas: ${data.failed}</span>`;
+      }
+    } catch (error) {
+      result.textContent = String(error);
+    } finally {
+      send.disabled = false;
+      send.textContent = 'Enviar disparo';
+    }
+  });
+
+  syncPreview();
+</script>
+</body>
+</html>
